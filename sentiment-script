@@ -1,52 +1,112 @@
 import spacy
 from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline
-import nltk
 from fpdf import FPDF
+import os
 
 # modules
 # spacy: for NER, POS Tagging
-# transformers: 
-# NLTK: stemming and lemmtization, stop word removal 
+# transformers: for sentiment analysis
+# fpdf: create the pdf analysis
+# os: trigger the pdf open
 
-#spacy's NER model
+# Load Spacy's NER model
 nlp = spacy.load("en_core_web_sm")
 
-# Load the model and tokenizer
-
-# this particular model was trained on twitter sentiment data: i.e. very good!
+# Load the sentiment analysis model
 MODEL = "cardiffnlp/twitter-roberta-base-sentiment"
 tokenizer = AutoTokenizer.from_pretrained(MODEL)
 model = AutoModelForSequenceClassification.from_pretrained(MODEL)
 
-#Hugging face's sentiment analysis pipeline
+# Hugging face's sentiment analysis pipeline
 sentiment_pipeline = pipeline("sentiment-analysis", model=model, tokenizer=tokenizer)
 
-# function to conduct sentiment analysis 
+# Function to conduct sentiment analysis 
 def analyse_sentiment(text):
     sentiment = sentiment_pipeline(text)
     return sentiment
 
-# function for POS tagging
-
-# function for Named Entity Rcognition (NER) and POS Tagging
+# Function for POS tagging and Named Entity Recognition
 def ner_and_pos(text):
     ner_list = nlp(text)
     named_entities = [{"text": ent.text, "labels": ent.label_} for ent in ner_list.ents]
     pos_tags = [{"text": token.text, "pos": token.pos_} for token in ner_list]
     return {"entities": named_entities, "pos_tags": pos_tags}
 
-#function for nlp pipeline
+# Function for the NLP pipeline
 def nlp_pipeline(text):
     sentiment = analyse_sentiment(text)
     entries = ner_and_pos(text)
+    return sentiment, entries
 
-    return sentiment #entries]
+# Define image selection based on sentiment score
+def get_sentiment_image(label):
+    if label == "Happy":
+        return "face-happy.png"
+    elif label == "Sad":
+        return "face-sad.png"
+    else:  # Neutral sentiment
+        return "face-neutral.png"
 
+# Create the PDF
+def create_pdf(text):
+    sentiment, entries = nlp_pipeline(text)
 
+    pdf = FPDF()
+    pdf.add_page()
 
+    # Add page border
+    pdf.set_line_width(0.5)
+    pdf.rect(5.0, 5.0, 200.0, 287.0)  # Border dimensions
+
+    # Title: Sentiment Analysis
+    pdf.set_font("Arial", 'B', 16)
+    pdf.set_text_color(0, 0, 0)  # Black text
+    pdf.cell(0, 10, txt="Sentiment Analysis Report", ln=True, align='C')
+
+    # Add sentiment result
+    pdf.ln(5)  # Add line break
+    sentiment_label = sentiment[0]['label']  # Ensure correct label
+    if sentiment_label == "LABEL_0":
+        sentiment_label = "Sad"
+    elif sentiment_label == "LABEL_2":
+        sentiment_label = "Happy"
+    else:
+        sentiment_label = "Normal"
+
+    sentiment_score = sentiment[0]['score'] * 100
+    pdf.set_font("Arial", size=15)
+    pdf.cell(0, 10, txt=f"Sentiment: {sentiment_label}", ln=True, align='C')
+    pdf.cell(0, 10, txt=f"Certainty: {sentiment_score:.2f}%", ln=True, align='C')
+
+    # Add sentiment image
+    pdf.ln(5)  # Add line break
+    sentiment_image = get_sentiment_image(sentiment_label)
+    pdf.image(sentiment_image, x=80, y=50, w=50)  # Position image at the center
+
+    # Add POS tags
+    pdf.ln(60)  # Add space after the image
+    pdf.set_font("Arial", 'B', 14)
+    pdf.cell(0, 10, txt="Part of Speech (POS) Tags:", ln=True, align='C')
+    pdf.set_font("Arial", size=12)
+    for tag in entries["pos_tags"]:
+        pdf.cell(0, 10, txt=f"{tag['text']}: {tag['pos']}", ln=True, align='C')
+
+    # Add NER (Named Entity Recognition)
+    pdf.ln(5)  # Add line break
+    pdf.set_font("Arial", 'B', 14)
+    pdf.cell(0, 10, txt="Named Entity Recognition (NER):", ln=True, align='C')
+    pdf.set_font("Arial", size=12)
+    for entity in entries["entities"]:
+        pdf.cell(0, 10, txt=f"{entity['text']}: {entity['labels']}", ln=True, align='C')
+
+    # Save the PDF
+    pdf_output_path = "sentiment_analysis_output.pdf"
+    pdf.output(pdf_output_path)
+
+    # Open the PDF
+    os.system(f"open {pdf_output_path}")
+
+# Main execution
 while True:
     text = input("Enter your text: ")
-    pdf = FPDP()
-    
-    print(nlp_pipeline(text))
-
+    create_pdf(text)
