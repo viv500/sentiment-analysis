@@ -1,0 +1,52 @@
+import spacy
+from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline
+import nltk
+from fpdf import FPDF
+
+# modules
+# spacy: for NER, POS Tagging
+# transformers: 
+# NLTK: stemming and lemmtization, stop word removal 
+
+#spacy's NER model
+nlp = spacy.load("en_core_web_sm")
+
+# Load the model and tokenizer
+
+# this particular model was trained on twitter sentiment data: i.e. very good!
+MODEL = "cardiffnlp/twitter-roberta-base-sentiment"
+tokenizer = AutoTokenizer.from_pretrained(MODEL)
+model = AutoModelForSequenceClassification.from_pretrained(MODEL)
+
+#Hugging face's sentiment analysis pipeline
+sentiment_pipeline = pipeline("sentiment-analysis", model=model, tokenizer=tokenizer)
+
+# function to conduct sentiment analysis 
+def analyse_sentiment(text):
+    sentiment = sentiment_pipeline(text)
+    return sentiment
+
+# function for POS tagging
+
+# function for Named Entity Rcognition (NER) and POS Tagging
+def ner_and_pos(text):
+    ner_list = nlp(text)
+    named_entities = [{"text": ent.text, "labels": ent.label_} for ent in ner_list.ents]
+    pos_tags = [{"text": token.text, "pos": token.pos_} for token in ner_list]
+    return {"entities": named_entities, "pos_tags": pos_tags}
+
+#function for nlp pipeline
+def nlp_pipeline(text):
+    sentiment = analyse_sentiment(text)
+    entries = ner_and_pos(text)
+
+    return sentiment #entries]
+
+
+
+while True:
+    text = input("Enter your text: ")
+    pdf = FPDP()
+    
+    print(nlp_pipeline(text))
+
